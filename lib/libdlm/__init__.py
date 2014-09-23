@@ -109,12 +109,25 @@ class Downloader(threading.Thread):
 
 
 ###############################################################################
-class DownloadManager():
+class Settings(object):
+    pass
+
+    
+###############################################################################
+class DownloadManager(threading.Thread):
     '''
     Spawns dowloader threads and manages URL downloads queue
     '''
 
-    def __init__(self, thread_count=10, logger=None):
+    def __init__(self, settings=None, logger=None):
+        threading.Thread.__init__(self)
+
+        if settings is None:
+            self.settings = Settings()
+            self.settings.thread_count = 5
+        else:
+            self.settings = settings
+
         # allow one to specify a logging facility or create a new one
         if logger is None:
             self._log = configure_logging('dlm')
@@ -122,8 +135,8 @@ class DownloadManager():
             self._log = logger
             
         self._log.info('starting')
-        self.ids = range(thread_count)
-        self.thread_count = thread_count
+        self.ids = range(self.settings.thread_count)
+        self.thread_count = self.settings.thread_count
         self.queue = []
         for id in self.ids:
             thread = Downloader(id, self.queue, logger=self._log)
@@ -145,8 +158,15 @@ def configure_logging(name):
     return log
     
 
+def start_dlm(settings=None):
+    dlm = DownloadManager(settings=None)
+    dlm.daemon = True
+    dlm.start()
+    return dlm
+
+
 if __name__ == '__main__':
-    dlm = DownloadManager()
+    dlm = start_dlm()
     dlm.append('http://en.wikipedia.org/wiki/HTTP_403', '.')
     dlm.append('http://en.wikipedia.org/wiki/HTTP_404', '.')
     dlm.append('http://en.wikipedia.org/wiki/HTTP_400', '.')
