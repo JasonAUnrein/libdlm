@@ -9,8 +9,14 @@ import ftplib
 import logging
 import os
 import urllib
-import urllib2
-import urlparse
+try:
+    import urllib2
+except ImportError:
+    import urllib.request as urllib2
+try:
+    import urlparse
+except ImportError:
+    from urllib.parse import urlparse
 import socket
 from furl import furl
 
@@ -88,7 +94,7 @@ class FileDownloader(object):
             try:
                 data = url_obj.read(8192)
             except (socket.timeout, socket.error) as err:
-                print "caught ", err
+                self._log.error("caught %s" % err)
                 self._retry()
                 break
             if not data:
@@ -106,7 +112,7 @@ class FileDownloader(object):
             if self.get_local_file_size() != self.url_file_size:
                 self.resume()
         else:
-            print 'retries all used up'
+            self._log.error('retries all used up')
             return False, "Retries Exhausted"
 
     def _auth_http(self):

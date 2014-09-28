@@ -18,6 +18,7 @@ sys.path.append(PKG_DIR)
 from libdlm import __version__
 
 if __name__ == '__main__':
+    INSTALL_REQUIRES = ['furl>=0.3.95', 'orderedmultidict>=0.7.3']
     setup(
         name="libdlm",
         version=__version__,
