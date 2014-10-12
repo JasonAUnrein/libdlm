@@ -7,7 +7,7 @@ Libdlm is a library and application for managing downloads.  The intent is to
 provide a simple API that allows developers to quickly add a concurrent and
 restartable download manager to an application.  There should be hooks to not
 only start/stop/restart downloads but also receive download status updates such
-as complete and X% done. 
+as complete and X% done.
 
 Future versions enhancements could include support for different download
 methods such as jigdo and torrents.
@@ -43,15 +43,14 @@ __email__ = 'JasonAUnrein@gmail.com'
 __status__ = 'Development'
 
 # Imports #####################################################################
-import os
 import threading
-#from ._json import JSON
+'''
 try:
     from urllib2 import urlopen, URLError, HTTPError
 except ImportError:
     from urllib.request import urlopen
     from urllib.error import URLError, HTTPError
-import time
+'''
 from time import sleep
 import logging
 from libdlm.file_downloader import FileDownloader
@@ -68,70 +67,92 @@ class States(object):
 
 
 ###############################################################################
+class DownloadFile(object):
+    '''
+    Represents the file being downloaded and maintains the information for
+    both the user and the library
+    '''
+
+    def __init__(self, src, dest):
+        self.src = src
+        self.dest = dest
+        self.complete = False
+
+
+###############################################################################
 class Downloader(threading.Thread):
     '''
     Threaded File Downloader
-    
+
     Downloader class - reads queue and downloads each file in succession
     '''
 
     def __init__(self, id, queue, logger):
-        threading.Thread.__init__(self,name=id)
+        threading.Thread.__init__(self, name=id)
         self.state = States.INIT
         self._log = logger
         self.id = id
         self.queue = queue
         self.running = True
-        
 
     def run(self):
         while self.running:
             self.state = States.RUNNING
             # gets the url from the queue
             try:
-                src, dst = self.queue.pop(0)
+                dlf = self.queue.pop(0)
             except:
                 sleep(1)
                 continue
-            if not src:
+            if not dlf:
                 continue
 
             # download the file
-            self._log.info('* Thread %d - processing URL: %s' % (thread.get_ident(), src))
+            self._log.info('* Thread %d - processing URL: %s' %
+                           (self.get_ident(), dlf.src))
             try:
                 self.state = States.DOWNLOADING
-                downloader = FileDownloader(src, dst)
+                downloader = FileDownloader(dlf.src, dlf.dst)
                 downloader.download()
-                self._log.info('* Thread %d - download complete' % thread.get_ident())
+                dlf.complete = True
+                self._log.info('* Thread %d - download complete' %
+                               self.get_ident())
             except Exception as err:
                 self._log.error(err)
-            # self.download_file(src, dst)
+
         self.state = States.STOPPED
-            
+
     def stop(self):
         self.running = False
         self.state = States.STOPPING
-        
+
 
 ###############################################################################
 class Settings(object):
     thread_count = 5
     short_name = 'dlm'
-    
+
     def __init__(self, kwargs=None):
         if kwargs:
-            for key,value in kwargs.items():
+            for key, value in kwargs.items():
                 setattr(self, key, value)
     pass
 
-    
+
 ###############################################################################
 class DownloadManager(object):
     '''
     Spawns downloader threads and manages the URL download queue
     '''
+    _shared_state = {}
 
-    def __init__(self, settings=None, logger=None):
+    def __init__(self, settings=None, logger=None, borg=False):
+        if borg and self._shared_state:
+            self.__dict__ = self._shared_state
+            return
+        elif borg:
+            self.__dict__ = self._shared_state
+
         if settings is None:
             self.settings = Settings()
         else:
@@ -142,8 +163,7 @@ class DownloadManager(object):
             self._log = configure_logging(self.settings.short_name)
         else:
             self._log = logger
-            
-        self._log.info('starting')
+
         self.ids = range(self.settings.thread_count)
         self.thread_count = self.settings.thread_count
         self.queue = []
@@ -155,26 +175,28 @@ class DownloadManager(object):
             self.threads.append(thread)
 
     def append(self, src, dest):
-        self.queue.append((src, dest))
+        dlf = DownloadFile(src, dest)
+        self.queue.append(dlf)
+        return dlf
 
     def stop(self):
         for thread in self.threads:
             thread.running = False
         for thread in self.threads:
             thread.join()
-            
-    def start(self):    
+
+    def start(self):
         for thread in self.threads:
             thread.running = True
             thread.start()
-            
+
     def marco(self):
         for thread in self.threads:
             if not thread.running:
                 raise Exception
         return "polo"
 
-        
+
 def configure_logging(name):
     log = logging.getLogger()
     log.setLevel(logging.DEBUG)
@@ -184,7 +206,7 @@ def configure_logging(name):
     console.setLevel(logging.DEBUG)
     log.addHandler(console)
     return log
-    
+
 
 if __name__ == '__main__':
     dlm = DownloadManager()

@@ -52,8 +52,9 @@ class FileDownloader(object):
     >>> downloader.resume()
     '''
 
-    def __init__(self, url, local_file_dir=None, local_file_name=None, username=None, password=None,
-                 timeout=120.0, retries=5, logger=None, max_segments=10):
+    def __init__(self, url, local_file_dir=None, local_file_name=None,
+                 username=None, password=None, timeout=120.0, retries=5,
+                 logger=None, max_segments=10):
         '''Note that auth argument expects a tuple, ('username','password')'''
         if not logger:
             self._log = logging.getLogger('FileDownloader')
@@ -75,17 +76,20 @@ class FileDownloader(object):
             self.url_file_size = self.get_url_file_size()
         except urllib2.HTTPError:
             self.url_file_size = None
-        
+
         if not local_file_dir:
             self.local_file_dir = os.getcwd()
         else:
             self.local_file_dir = local_file_dir
-            
+
         # if no filename given pulls filename from the url
         if not local_file_name:
-            self.local_file_name = os.path.join(self.local_file_dir, self.get_url_file_name(self.url))
+            self.local_file_name = os.path.join(
+                self.local_file_dir,
+                self.get_url_file_name(self.url))
         else:
-            self.local_file_name = os.path.join(self.local_file_dir, local_file_name)
+            self.local_file_name = os.path.join(self.local_file_dir,
+                                                local_file_name)
 
     def _download_file(self, url_obj, file_obj, callback=None):
         '''starts the download loop'''
@@ -131,13 +135,13 @@ class FileDownloader(object):
         '''handles ftp authentication'''
         self.url.username = self.username
         self.url.password = self.password
-        
+
         req = urllib2.Request(str(self.url))
         req.timeout = self.timeout
 
         ftped = urllib2.FTPHandler()
         ftp_obj = ftped.ftp_open(req)
-        
+
         return ftp_obj
 
     def _start_http_resume(self, restart=None, callback=None):
@@ -230,7 +234,8 @@ class FileDownloader(object):
         if self.username:
             if self.url.scheme == 'http':
                 self._auth_http()
-                urllib2_obj = urllib2.urlopen(str(self.url), timeout=self.timeout)
+                urllib2_obj = urllib2.urlopen(str(self.url),
+                                              timeout=self.timeout)
                 self._download_file(urllib2_obj, file_hndl, callback=callback)
             elif self.url.scheme == 'ftp':
                 auth_obj = self._auth_ftp()
