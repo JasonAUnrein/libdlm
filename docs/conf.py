@@ -58,9 +58,7 @@ copyright = COPYRIGHT
 THIS_DIR = os.path.realpath(os.path.dirname(__file__))
 LIB_DIR = os.path.realpath(os.path.join(THIS_DIR, '..', 'lib'))
 sys.path.append(LIB_DIR)
-from libdlm import VERSION
-# Read the version from our project
-__version__ = VERSION
+from libdlm import __version__
 
 # Generate the automatic lib documentation
 genpath = os.path.join(THIS_DIR, 'auto-generate.py')
