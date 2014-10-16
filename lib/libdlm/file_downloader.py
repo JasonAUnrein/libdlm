@@ -20,6 +20,8 @@ except ImportError:
 import socket
 from furl import furl
 
+LOG = None
+
 
 class FileDownloader(object):
     '''
@@ -56,8 +58,9 @@ class FileDownloader(object):
                  username=None, password=None, timeout=120.0, retries=5,
                  logger=None, max_segments=10):
         '''Note that auth argument expects a tuple, ('username','password')'''
-        if not logger:
-            self._log = logging.getLogger('FileDownloader')
+        global LOG
+        if logger:
+            LOG = logging.getLogger('%s.FileDownloader' % logger)
         self.url = furl(url)
         self.url_file_name = None
         self.progress = 0
@@ -98,7 +101,7 @@ class FileDownloader(object):
             try:
                 data = url_obj.read(8192)
             except (socket.timeout, socket.error) as err:
-                self._log.error("caught %s" % err)
+                LOG.error("caught %s" % err)
                 self._retry()
                 break
             if not data:
@@ -116,7 +119,7 @@ class FileDownloader(object):
             if self.get_local_file_size() != self.url_file_size:
                 self.resume()
         else:
-            self._log.error('retries all used up')
+            LOG.error('retries all used up')
             return False, "Retries Exhausted"
 
     def _auth_http(self):

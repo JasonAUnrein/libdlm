@@ -106,9 +106,7 @@ if __name__ == '__main__':
 
     # Read the version from our project
     sys.path.append(LIB_DIR)
-    from libdlm import VERSION
-    # Read the version from our project
-    __version__ = VERSION
+    from libdlm import __version__
 
     remove_directory(release_dir, remove_top=False, filter=lambda x: "keep" not in x)
 

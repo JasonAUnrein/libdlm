@@ -31,11 +31,23 @@ class SanityTest(unittest.TestCase):
         dlm = DownloadManager()
         dlm.append('http://www.gutenberg.org/cache/epub/16328/pg16328.txt',
                    '.')
+        dlm.append('http://www.gutenberg.org/cache/epub/invalid_url',
+                   '.', self.dl_assert_err_callback)
+        dlm.append('http://www.gutenberg.org/cache/epub/16328/pg16328.txt',
+                   '.', self.dl_assert_noerr_callback)
 
     def test_dlf(self):
         '''Quick check fo the DownloadFile class'''
         self.assertRaises(TypeError, DownloadFile)
         self.assertEqual(type(DownloadFile(1, 2)), DownloadFile)
+
+    def dl_assert_err_callback(self, url, err=None):
+        '''callback from DownloadManager to verify an exception is raised'''
+        self.assertEqual(isinstance(err, Exception), True)
+
+    def dl_assert_noerr_callback(self, url, err=None):
+        '''callback from DownloadManager to verify no exception is raised'''
+        self.assertEqual(isinstance(err, Exception), False)
 
 
 ###############################################################################
