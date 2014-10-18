@@ -31,7 +31,7 @@ if __name__ == '__main__':
         package_data={"libdlm": ['.*']},
         zip_safe=True,
         include_package_data=True,
-        test_suite="tests",
+        test_suite="libdlm.tests.sanity_checks",
 
         classifiers=[
             'Development Status :: 5 - Production/Stable',
