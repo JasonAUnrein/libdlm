@@ -94,22 +94,20 @@ class Downloader(threading.Thread):
         self.logger = logger
 
     def run(self):
+        self.state = States.RUNNING
         while self.running:
-            self.state = States.RUNNING
             # gets the url from the queue
             try:
                 dlf = self.queue.pop(0)
+                self.state = States.DOWNLOADING
             except Exception as err:
                 time.sleep(1)
-                continue
-            if not dlf:
                 continue
 
             # download the file
             LOG.debug('* Thread %d - processing URL: %s to %s' %
                       (threading.current_thread().ident, dlf.src, dlf.dst))
             try:
-                self.state = States.DOWNLOADING
                 downloader = FileDownloader(dlf.src, dlf.dst,
                                             logger=self.logger)
                 downloader.download()
@@ -119,15 +117,20 @@ class Downloader(threading.Thread):
                 LOG.debug('* Thread %d - download complete' %
                           threading.current_thread().ident)
             except Exception as err:
-                LOG.error(err, exec_info=True)
+                LOG.error(err, exc_info=True)
                 if dlf.cb:
-                    dlf.cb(dlf.srcerr)
+                    dlf.cb(dlf.src, err)
+            self.state = States.RUNNING
 
         self.state = States.STOPPED
 
-    def stop(self):
+    def pause(self):
         self.running = False
         self.state = States.STOPPING
+
+    def resume(self):
+        self.running = True
+        self.state = States.RUNNING
 
 
 ###############################################################################
@@ -148,17 +151,21 @@ class DownloadManager(object):
     '''
     __shared_state = {}
 
+    @classmethod
+    def reset_borg(cls):
+        cls.__shared_state = {}
+
     def __init__(self, settings=None, logger=None, borg=False):
         global LOG
-        if logger is not None:
-            LOG = configure_logging(logger)
+
         self.__dict__ = self.__shared_state
         if borg and self.__shared_state:
             self.__dict__ = self.__shared_state
             return
         elif borg:
             self.__dict__ = self.__shared_state
-            self.borg = True
+
+        self.borg = True
         self.logger_name = logger
 
         if settings is None:
@@ -188,16 +195,13 @@ class DownloadManager(object):
         self.queue.append(dlf)
         return dlf
 
-    def stop(self):
+    def pause(self):
         for thread in self.threads:
-            thread.running = False
-        for thread in self.threads:
-            thread.join()
+            thread.pause()
 
-    def start(self):
+    def resume(self):
         for thread in self.threads:
-            thread.running = True
-            thread.start()
+            thread.resume()
 
     def marco(self):
         for thread in self.threads:
@@ -205,14 +209,17 @@ class DownloadManager(object):
                 raise Exception
         return "polo"
 
+    def is_busy(self):
+        if len(self.queue) != 0:
+            return True
+
+        for thread in self.threads:
+            if thread.state == States.DOWNLOADING:
+                return True
+
+        return False
+
 
 def configure_logging(name):
     log = logging.getLogger("%s.dlm" % name)
     return log
-
-
-if __name__ == '__main__':
-    dlm = DownloadManager()
-    dlm.append('http://en.wikipedia.org/wiki/HTTP_403', '.')
-    dlm.append('http://en.wikipedia.org/wiki/HTTP_404', '.')
-    dlm.append('http://en.wikipedia.org/wiki/HTTP_400', '.')

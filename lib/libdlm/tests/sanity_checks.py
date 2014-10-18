@@ -4,6 +4,8 @@
 # from os import path, remove
 import unittest
 from libdlm import DownloadFile, DownloadManager, Settings
+from time import sleep
+import logging
 
 
 ###############################################################################
@@ -26,15 +28,52 @@ class SanityTest(unittest.TestCase):
         self.assertEqual(dlm1.settings.thread_count,
                          dlm2.settings.thread_count)
 
+        logging.getLogger("dlmtest")
+        DownloadManager(logger="dlmtest")
+
+        del(dlm)
+        del(dlm1)
+        del(dlm2)
+        DownloadManager.reset_borg()
+
+        dlm = DownloadManager(borg=True)
+        self.assertNotEqual(dlm.logger_name, "dlmtest")
+
     def test_dl(self):
         '''Verify successful downloads'''
         dlm = DownloadManager()
-        dlm.append('http://www.gutenberg.org/cache/epub/16328/pg16328.txt',
+
+        # test valid url
+        dlm.append('http://kernel.org',
                    '.')
-        dlm.append('http://www.gutenberg.org/cache/epub/invalid_url',
-                   '.', self.dl_assert_err_callback)
-        dlm.append('http://www.gutenberg.org/cache/epub/16328/pg16328.txt',
+
+        # test valid url with callback
+        dlm.append('http://kernel.org',
                    '.', self.dl_assert_noerr_callback)
+
+        # test invalid url with callback
+        dlm.append('https://www.kernel.org/invalid.html',
+                   '.', self.dl_assert_err_callback)
+
+        # test invalid url with no callback
+        dlm.append('https://www.kernel.org/invalid.html',
+                   '.')
+        self.assertEqual(dlm.is_busy(), True)
+
+        while dlm.is_busy():
+            sleep(.1)
+
+        # verify we are stopped and we respond appropriately
+        dlm.pause()
+        sleep(2)
+        self.assertRaises(Exception, dlm.marco)
+        self.assertEqual(dlm.is_busy(), False)
+
+        # verify we are running and we respond appropriately
+        dlm.resume()
+        sleep(2)
+        self.assertEqual(dlm.is_busy(), False)
+        self.assertEqual(dlm.marco(), "polo")
 
     def test_dlf(self):
         '''Quick check fo the DownloadFile class'''
