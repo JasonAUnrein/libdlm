@@ -63,22 +63,14 @@ class SanityTest(unittest.TestCase):
         while dlm.is_busy():
             sleep(.1)
 
-        # verify we are stopped and we respond appropriately
+        # verify we are paused and we respond appropriately
         dlm.pause()
         sleep(2)
-        self.assertRaises(Exception, dlm.marco)
         self.assertEqual(dlm.is_busy(), False)
-
-        # verify we are running and we respond appropriately
-        dlm.resume()
-        sleep(2)
-        self.assertEqual(dlm.is_busy(), False)
-        self.assertEqual(dlm.marco(), "polo")
 
     def test_dlf(self):
-        '''Quick check fo the DownloadFile class'''
-        self.assertRaises(TypeError, DownloadFile)
-        self.assertEqual(type(DownloadFile(1, 2)), DownloadFile)
+        '''Quick check for the DownloadFile class'''
+        self.assertEqual(type(DownloadFile(1, 2, 3, 4)), DownloadFile)
 
     def dl_assert_err_callback(self, url, err=None):
         '''callback from DownloadManager to verify an exception is raised'''
@@ -91,4 +83,4 @@ class SanityTest(unittest.TestCase):
 
 ###############################################################################
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)

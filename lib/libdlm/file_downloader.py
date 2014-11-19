@@ -65,7 +65,8 @@ class FileDownloader(object):
         self.url_file_name = None
         self.progress = 0
         self.file_size = None
-        if not (username is None and password is None):
+        if (username is not None and password is None) or \
+           (username is None and password is not None):
             raise ValueError("Both username and password must be set or "
                              "neither can be set: username=%s, password=%s" %
                              (username, password))
@@ -102,15 +103,18 @@ class FileDownloader(object):
                 data = url_obj.read(8192)
             except (socket.timeout, socket.error) as err:
                 LOG.error("caught %s" % err)
+                file_obj.flush()
                 self._retry()
                 break
             if not data:
+                file_obj.flush()
                 file_obj.close()
                 break
             file_obj.write(data)
             self.cur += 8192
-            if callback:
-                callback(cur_size=self.cur)
+            # LOG.debug("read/wrote total of %d bytes" % self.cur)
+            # if callback:
+            #    callback(cur_size=self.cur)
 
     def _retry(self):
         '''auto-resumes up to self.retries'''
@@ -190,6 +194,7 @@ class FileDownloader(object):
         ftper.sendcmd("REST " + str(cur_size))
         down_cmd = "RETR " + file_name
         ftper.retrbinary(down_cmd, file_hndl.write)
+        file_hndl.flush()
 
     def get_url_file_name(self, url):
         '''returns filename from url'''
