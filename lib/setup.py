@@ -14,8 +14,7 @@ except ImportError:
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 PKG_DIR = os.path.join(THIS_DIR, 'lib')
 sys.path.append(PKG_DIR)
-# Read the version from our project
-from libdlm import __version__
+__version__ = "0.0.1"
 
 if __name__ == '__main__':
     INSTALL_REQUIRES = ['furl>=0.3.95', 'orderedmultidict>=0.7.3']
@@ -26,12 +25,12 @@ if __name__ == '__main__':
         author="Jason Unrein",
         url="https://github.com/JasonAUnrein/libdlm",
         download_url="https://github.com/JasonAUnrein/libdlm/blob/master/release/libdlm-{0}.tar.gz".format(__version__),
-        install_requires=[],
+        install_requires=["furl", "unittest2"],
         packages=find_packages(),
         package_data={"libdlm": ['.*']},
         zip_safe=True,
         include_package_data=True,
-        test_suite="tests",
+        test_suite="libdlm.tests",
 
         classifiers=[
             'Development Status :: 5 - Production/Stable',
