@@ -96,7 +96,7 @@ class DownloadFile(object):
     '''
 
     @debugger
-    def __init__(self, src, dst, username, password, cb=None):
+    def __init__(self, src, dst, username=None, password=None, cb=None):
         self.src = src
         self.dst = dst
         self.username = username
