@@ -20,6 +20,8 @@ except ImportError:
 import socket
 from furl import furl
 
+LOG = None
+
 
 class FileDownloader(object):
     '''
@@ -56,13 +58,15 @@ class FileDownloader(object):
                  username=None, password=None, timeout=120.0, retries=5,
                  logger=None, max_segments=10):
         '''Note that auth argument expects a tuple, ('username','password')'''
-        if not logger:
-            self._log = logging.getLogger('FileDownloader')
+        global LOG
+        if logger:
+            LOG = logging.getLogger('%s.FileDownloader' % logger)
         self.url = furl(url)
         self.url_file_name = None
         self.progress = 0
         self.file_size = None
-        if not (username is None and password is None):
+        if (username is not None and password is None) or \
+           (username is None and password is not None):
             raise ValueError("Both username and password must be set or "
                              "neither can be set: username=%s, password=%s" %
                              (username, password))
@@ -98,16 +102,19 @@ class FileDownloader(object):
             try:
                 data = url_obj.read(8192)
             except (socket.timeout, socket.error) as err:
-                self._log.error("caught %s" % err)
+                LOG.error("caught %s" % err)
+                file_obj.flush()
                 self._retry()
                 break
             if not data:
+                file_obj.flush()
                 file_obj.close()
                 break
             file_obj.write(data)
             self.cur += 8192
-            if callback:
-                callback(cur_size=self.cur)
+            # LOG.debug("read/wrote total of %d bytes" % self.cur)
+            # if callback:
+            #    callback(cur_size=self.cur)
 
     def _retry(self):
         '''auto-resumes up to self.retries'''
@@ -116,7 +123,7 @@ class FileDownloader(object):
             if self.get_local_file_size() != self.url_file_size:
                 self.resume()
         else:
-            self._log.error('retries all used up')
+            LOG.error('retries all used up')
             return False, "Retries Exhausted"
 
     def _auth_http(self):
@@ -187,6 +194,7 @@ class FileDownloader(object):
         ftper.sendcmd("REST " + str(cur_size))
         down_cmd = "RETR " + file_name
         ftper.retrbinary(down_cmd, file_hndl.write)
+        file_hndl.flush()
 
     def get_url_file_name(self, url):
         '''returns filename from url'''

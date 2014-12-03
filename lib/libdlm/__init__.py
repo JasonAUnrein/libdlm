@@ -37,23 +37,45 @@ __author__ = 'Jason Unrein'
 __copyright__ = 'Copyright 2014'
 __credits__ = ['Jason Unrein']
 __license__ = 'GPL'
-__version__ = '0.0.1'  # project version
+__version__ = '0.0.2'  # project version
 __maintainer__ = 'Jason Unrein'
 __email__ = 'JasonAUnrein@gmail.com'
 __status__ = 'Development'
 
 # Imports #####################################################################
 import threading
-'''
-try:
-    from urllib2 import urlopen, URLError, HTTPError
-except ImportError:
-    from urllib.request import urlopen
-    from urllib.error import URLError, HTTPError
-'''
-from time import sleep
+import time
 import logging
 from libdlm.file_downloader import FileDownloader
+
+
+DEBUG = False
+LOG = logging.getLogger(__name__)
+LOG.setLevel(logging.DEBUG)
+LOG.propagate = False
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+LOG.addHandler(console_handler)
+
+
+###############################################################################
+def debugger(func):
+    '''decorator to add/remove wrapper debug prints'''
+    def func_wrapper(*args, **kwargs):
+        global DEBUG, LOG
+        rtn = None
+        if DEBUG:
+            LOG.debug('Entered %s' % func.__name__)
+        try:
+            rtn = func(*args, **kwargs)
+        except Exception as err:
+            LOG.debug('Exception %s' % err, exc_info=True)
+            raise
+        if DEBUG:
+            LOG.debug('Left %s' % func.__name__)
+        return rtn
+
+    return func_wrapper
 
 
 ###############################################################################
@@ -73,9 +95,13 @@ class DownloadFile(object):
     both the user and the library
     '''
 
-    def __init__(self, src, dest):
+    @debugger
+    def __init__(self, src, dst, username, password, cb=None):
         self.src = src
-        self.dest = dest
+        self.dst = dst
+        self.username = username
+        self.password = password
+        self.cb = cb
         self.complete = False
 
 
@@ -87,44 +113,69 @@ class Downloader(threading.Thread):
     Downloader class - reads queue and downloads each file in succession
     '''
 
+    @debugger
     def __init__(self, id, queue, logger):
         threading.Thread.__init__(self, name=id)
         self.state = States.INIT
-        self._log = logger
         self.id = id
         self.queue = queue
         self.running = True
+        self.count = 0
+        self.logger = logger
+        self.transition_to = States.RUNNING
 
+    @debugger
     def run(self):
         while self.running:
+            if self.transition_to == States.PAUSED:
+                self.state = States.PAUSED
+                while self.transition_to == States.PAUSED:
+                    time.sleep(1)
+
             self.state = States.RUNNING
             # gets the url from the queue
             try:
                 dlf = self.queue.pop(0)
-            except:
-                sleep(1)
+            except Exception as err:
+                time.sleep(1)
                 continue
             if not dlf:
                 continue
 
             # download the file
-            self._log.info('* Thread %d - processing URL: %s' %
-                           (self.get_ident(), dlf.src))
+            LOG.debug('* Thread %d - processing URL: %s to %s' %
+                      (threading.current_thread().ident, dlf.src, dlf.dst))
             try:
                 self.state = States.DOWNLOADING
-                downloader = FileDownloader(dlf.src, dlf.dst)
+                downloader = FileDownloader(dlf.src, dlf.dst,
+                                            username=dlf.username,
+                                            password=dlf.password,
+                                            logger=self.logger)
                 downloader.download()
                 dlf.complete = True
-                self._log.info('* Thread %d - download complete' %
-                               self.get_ident())
+                if dlf.cb:
+                    dlf.cb(dlf.src)
+                LOG.debug('* Thread %d - download complete' %
+                          threading.current_thread().ident)
             except Exception as err:
-                self._log.error(err)
+                LOG.error(str(err), exc_info=True)
+                if callable(dlf.cb):
+                    try:
+                        dlf.cb(dlf.src, err)
+                    except Exception as err2:
+                        LOG.error(str(err2), exc_info=True)
+                        raise
 
         self.state = States.STOPPED
 
+    @debugger
     def stop(self):
         self.running = False
         self.state = States.STOPPING
+
+    @debugger
+    def pause(self):
+        self.transition_to = States.PAUSED
 
 
 ###############################################################################
@@ -132,11 +183,11 @@ class Settings(object):
     thread_count = 5
     short_name = 'dlm'
 
+    @debugger
     def __init__(self, kwargs=None):
         if kwargs:
             for key, value in kwargs.items():
                 setattr(self, key, value)
-    pass
 
 
 ###############################################################################
@@ -144,72 +195,85 @@ class DownloadManager(object):
     '''
     Spawns downloader threads and manages the URL download queue
     '''
-    _shared_state = {}
+    __shared_state = {}
 
+    @classmethod
+    def reset_borg(cls):
+        cls.__shared_state = {}
+
+    @debugger
     def __init__(self, settings=None, logger=None, borg=False):
-        if borg and self._shared_state:
-            self.__dict__ = self._shared_state
+        global LOG
+        if logger is not None:
+            LOG = configure_logging(logger)
+        self.__dict__ = self.__shared_state
+        if borg and self.__shared_state:
+            self.__dict__ = self.__shared_state
             return
         elif borg:
-            self.__dict__ = self._shared_state
+            self.__dict__ = self.__shared_state
+            self.borg = True
+        self.logger_name = logger
 
         if settings is None:
             self.settings = Settings()
         else:
             self.settings = settings
 
-        # allow one to specify a logging facility or create a new one
-        if logger is None:
-            self._log = configure_logging(self.settings.short_name)
-        else:
-            self._log = logger
-
         self.ids = range(self.settings.thread_count)
         self.thread_count = self.settings.thread_count
         self.queue = []
         self.threads = []
         for id in self.ids:
-            thread = Downloader(id, self.queue, logger=self._log)
-            thread.daemon = True
-            thread.start()
-            self.threads.append(thread)
+            self.threads.append(Downloader(id, self.queue,
+                                logger="%s.dlm" % self.logger_name))
+            self.threads[-1].daemon = True
+            self.threads[-1].start()
 
-    def append(self, src, dest):
-        dlf = DownloadFile(src, dest)
+    @debugger
+    def append(self, src, dst, cb=None, username=None, password=None):
+        dlf = DownloadFile(src, dst, username, password, cb)
         self.queue.append(dlf)
         return dlf
 
+    @debugger
+    def pause(self):
+        for thread in self.threads:
+            thread.pause()
+
+    @debugger
     def stop(self):
         for thread in self.threads:
             thread.running = False
         for thread in self.threads:
             thread.join()
 
+    @debugger
     def start(self):
         for thread in self.threads:
             thread.running = True
             thread.start()
 
+    @debugger
     def marco(self):
         for thread in self.threads:
             if not thread.running:
                 raise Exception
         return "polo"
 
+    def is_busy(self):
+        if len(self.queue) != 0:
+            # LOG.debug("length of queue = %d" % len(self.queue))
+            return True
+
+        for thread in self.threads:
+            # LOG.debug("state = %d" % thread.state)
+            if thread.state == States.DOWNLOADING:
+                return True
+
+        return False
+
 
 def configure_logging(name):
-    log = logging.getLogger()
-    log.setLevel(logging.DEBUG)
-
-    # console
-    console = logging.StreamHandler()
-    console.setLevel(logging.DEBUG)
-    log.addHandler(console)
+    log = logging.getLogger("%s.dlm" % name)
     return log
-
-
-if __name__ == '__main__':
-    dlm = DownloadManager()
-    dlm.append('http://en.wikipedia.org/wiki/HTTP_403', '.')
-    dlm.append('http://en.wikipedia.org/wiki/HTTP_404', '.')
-    dlm.append('http://en.wikipedia.org/wiki/HTTP_400', '.')
