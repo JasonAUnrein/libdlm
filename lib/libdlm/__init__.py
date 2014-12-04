@@ -23,24 +23,9 @@ Code Example
 ############
 
 
-Motivation
-##########
-
-
-Installation
-############
-
-
 '''
 
-__author__ = 'Jason Unrein'
-__copyright__ = 'Copyright 2014'
-__credits__ = ['Jason Unrein']
-__license__ = 'GPL'
-__version__ = '0.0.2'  # project version
-__maintainer__ = 'Jason Unrein'
-__email__ = 'JasonAUnrein@gmail.com'
-__status__ = 'Development'
+__version__ = '0.0.3'  # project version
 
 # Imports #####################################################################
 import threading
@@ -121,7 +106,8 @@ class Downloader(threading.Thread):
         self.queue = queue
         self.running = True
         self.count = 0
-        self.logger = logger
+        self.logger_name = "%s.%s" % (logger, 'downloader')
+        self.log = logging.getLogger(self.logger_name)
         self.transition_to = States.RUNNING
 
     @debugger
@@ -143,27 +129,27 @@ class Downloader(threading.Thread):
                 continue
 
             # download the file
-            LOG.debug('* Thread %d - processing URL: %s to %s' %
-                      (threading.current_thread().ident, dlf.src, dlf.dst))
+            self.log.debug('* Thread %d - processing URL: %s to %s' %
+                           (threading.current_thread().ident, dlf.src, dlf.dst))
             try:
                 self.state = States.DOWNLOADING
                 downloader = FileDownloader(dlf.src, dlf.dst,
                                             username=dlf.username,
                                             password=dlf.password,
-                                            logger=self.logger)
+                                            logger=self.logger_name)
                 downloader.download()
                 dlf.complete = True
                 if dlf.cb:
                     dlf.cb(dlf.src)
-                LOG.debug('* Thread %d - download complete' %
-                          threading.current_thread().ident)
+                self.log.debug('* Thread %d - download complete' %
+                               threading.current_thread().ident)
             except Exception as err:
-                LOG.error(str(err), exc_info=True)
+                self.log.error(str(err))
                 if callable(dlf.cb):
                     try:
                         dlf.cb(dlf.src, err)
                     except Exception as err2:
-                        LOG.error(str(err2), exc_info=True)
+                        self.log.error(str(err2), exc_info=True)
                         raise
 
         self.state = States.STOPPED
@@ -204,8 +190,6 @@ class DownloadManager(object):
     @debugger
     def __init__(self, settings=None, logger=None, borg=False):
         global LOG
-        if logger is not None:
-            LOG = configure_logging(logger)
         self.__dict__ = self.__shared_state
         if borg and self.__shared_state:
             self.__dict__ = self.__shared_state
@@ -213,12 +197,23 @@ class DownloadManager(object):
         elif borg:
             self.__dict__ = self.__shared_state
             self.borg = True
-        self.logger_name = logger
 
         if settings is None:
             self.settings = Settings()
         else:
             self.settings = settings
+
+        if logger is not None:
+            LOG = logging.getLogger("%s.%s" % (logger, self.settings.short_name))
+            self.logger_name = "%s.%s" % (logger, self.settings.short_name)
+        else:
+            LOG = logging.getLogger(self.settings.short_name)
+            self.logger_name = self.settings.short_name
+            LOG.setLevel(logging.DEBUG)
+            LOG.propagate = False
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.DEBUG)
+            LOG.addHandler(console_handler)
 
         self.ids = range(self.settings.thread_count)
         self.thread_count = self.settings.thread_count
@@ -226,7 +221,7 @@ class DownloadManager(object):
         self.threads = []
         for id in self.ids:
             self.threads.append(Downloader(id, self.queue,
-                                logger="%s.dlm" % self.logger_name))
+                                logger=self.logger_name))
             self.threads[-1].daemon = True
             self.threads[-1].start()
 
@@ -263,17 +258,10 @@ class DownloadManager(object):
 
     def is_busy(self):
         if len(self.queue) != 0:
-            # LOG.debug("length of queue = %d" % len(self.queue))
             return True
 
         for thread in self.threads:
-            # LOG.debug("state = %d" % thread.state)
             if thread.state == States.DOWNLOADING:
                 return True
 
         return False
-
-
-def configure_logging(name):
-    log = logging.getLogger("%s.dlm" % name)
-    return log

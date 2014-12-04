@@ -14,7 +14,8 @@ except ImportError:
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 PKG_DIR = os.path.join(THIS_DIR, 'lib')
 sys.path.append(PKG_DIR)
-__version__ = "0.0.1"
+# Read the version from our project
+__version__ = "0.0.3"
 
 if __name__ == '__main__':
     INSTALL_REQUIRES = ['furl>=0.3.95', 'orderedmultidict>=0.7.3']

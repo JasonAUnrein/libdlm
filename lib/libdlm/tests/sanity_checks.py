@@ -4,6 +4,8 @@
 # from os import path, remove
 import unittest
 from libdlm import DownloadFile, DownloadManager, Settings
+from time import sleep
+import logging
 
 
 ###############################################################################
@@ -26,18 +28,59 @@ class SanityTest(unittest.TestCase):
         self.assertEqual(dlm1.settings.thread_count,
                          dlm2.settings.thread_count)
 
+        logging.getLogger("dlmtest")
+        DownloadManager(logger="dlmtest")
+
+        del(dlm)
+        del(dlm1)
+        del(dlm2)
+        DownloadManager.reset_borg()
+
+        dlm = DownloadManager(borg=True)
+        self.assertNotEqual(dlm.logger_name, "dlmtest")
+
     def test_dl(self):
         '''Verify successful downloads'''
         dlm = DownloadManager()
-        dlm.append('http://www.gutenberg.org/cache/epub/16328/pg16328.txt',
+
+        # test valid url
+        dlm.append('http://kernel.org',
                    '.')
 
+        # test valid url with callback
+        dlm.append('http://kernel.org',
+                   '.', self.dl_assert_noerr_callback)
+
+        # test invalid url with callback
+        dlm.append('https://www.kernel.org/invalid.html',
+                   '.', self.dl_assert_err_callback)
+
+        # test invalid url with no callback
+        dlm.append('https://www.kernel.org/invalid.html',
+                   '.')
+        self.assertEqual(dlm.is_busy(), True)
+
+        while dlm.is_busy():
+            sleep(.1)
+
+        # verify we are paused and we respond appropriately
+        dlm.pause()
+        sleep(2)
+        self.assertEqual(dlm.is_busy(), False)
+
     def test_dlf(self):
-        '''Quick check fo the DownloadFile class'''
-        self.assertRaises(TypeError, DownloadFile)
-        self.assertEqual(type(DownloadFile(1, 2)), DownloadFile)
+        '''Quick check for the DownloadFile class'''
+        self.assertEqual(type(DownloadFile(1, 2, 3, 4)), DownloadFile)
+
+    def dl_assert_err_callback(self, url, err=None):
+        '''callback from DownloadManager to verify an exception is raised'''
+        self.assertEqual(isinstance(err, Exception), True)
+
+    def dl_assert_noerr_callback(self, url, err=None):
+        '''callback from DownloadManager to verify no exception is raised'''
+        self.assertEqual(isinstance(err, Exception), False, "url = %s, error = %s" % (url, err))
 
 
 ###############################################################################
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)

@@ -1,6 +1,9 @@
 [![travis ci build state](https://travis-ci.org/JasonAUnrein/libdlm.svg?branch=master)](https://travis-ci.org/JasonAUnrein/libdlm)
-
 [![rtd state](https://readthedocs.org/projects/libdlm/badge/?version=latest)](https://readthedocs.org/projects/libdlm/?badge=latest)
+[![Coverage Status](https://img.shields.io/coveralls/JasonAUnrein/libdlm.svg)](https://coveralls.io/r/JasonAUnrein/libdlm)
+[![Version](https://pypip.in/v/libdlm/badge.png)](https://pypi.python.org/pypi/libdlm)
+[![Downloads](https://pypip.in/d/libdlm/badge.png)](https://pypi.python.org/pypi/libdlm)
+
 
 ## Introduction
 

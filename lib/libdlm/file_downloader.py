@@ -5,9 +5,11 @@ Original Author: Joshua Banton
 Original GitHub: https://github.com/bantonj/fileDownloader
 '''
 
+import cgi
 import ftplib
 import logging
 import os
+import re
 import urllib
 try:
     import urllib2
@@ -198,8 +200,19 @@ class FileDownloader(object):
 
     def get_url_file_name(self, url):
         '''returns filename from url'''
-        return urllib.unquote(os.path.basename(str(url)))
+        try:
+            response = urllib2.urlopen(url)
+            _, params = cgi.parse_header(response.headers.get('Content-Disposition', ''))
+            return params['filename']
+        except Exception as err:
+            print("Server didn't provide filename, resorting to url")
+        try:
+            return url.path.segments[-1]
+        except Exception as err:
+            LOG.error("Unable to determine filename from url")
 
+        return re.sub('/', '_', str(url.url))
+            
     def get_url_file_size(self):
         '''gets filesize of remote file from ftp or http server'''
         if self.url.scheme == 'http':
